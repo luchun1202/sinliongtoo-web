@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>台語文字轉語音</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <div class="top-row">
+    <div>
+      <h1>台語文字轉語音</h1>
+      <p class="subtitle">全漢字／全羅／羅馬字加調號數字，三種寫法互相同步；按「播放語音」播放教育部台語辭典真人錄音。</p>
+      <p class="version-info">版本 v1.16.1｜最後更新 2026-09-12 14:14（台灣時間）｜完整記錄見「❓ 說明」</p>
+    </div>
+    <div class="top-row-actions">
+      <button id="helpToggle" type="button" title="使用說明">❓ 說明</button>
+      <button id="themeToggle" type="button" title="切換明亮／深色模式">🌙 深色</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="dictStatus">辭典載入中…</span>
+    <div class="status-actions">
+      <button id="reloadDictBtn" title="重新下載最新辭典資料">重新載入辭典</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="customStatus">尚未匯入自訂詞庫</span>
+    <div class="status-actions">
+      <label class="file-btn" for="customFileInput">匯入自訂詞庫（CSV／JSON）</label>
+      <input type="file" id="customFileInput" accept=".csv,.json,text/csv,application/json" hidden />
+      <button id="viewCustomBtn" disabled>查看自訂詞庫</button>
+      <button id="clearCustomBtn" disabled>清除自訂詞庫</button>
+    </div>
+  </div>
+
+  <div id="customViewer" class="custom-viewer" hidden>
+    <div class="custom-viewer-actions">
+      <button id="exportCustomBtn">匯出自訂詞庫（含音檔，JSON）</button>
+      <span class="custom-viewer-hint">匯出的檔案可以直接從上面「匯入自訂詞庫」讀回來；本機上傳的音檔會內嵌在同一個檔案裡一起備份，不用另外管理音檔。</span>
+    </div>
+    <div id="customViewerList" class="custom-viewer-list"></div>
+  </div>
+
+  <div class="status-bar">
+    <span id="audioStatus">尚未上傳自訂音檔</span>
+    <div class="status-actions">
+      <label class="file-btn" for="audioFileInput">上傳自訂音檔（可選多個）</label>
+      <input type="file" id="audioFileInput" accept="audio/*" multiple hidden />
+      <button id="clearAudioBtn" disabled>清除自訂音檔</button>
+    </div>
+  </div>
+
+  <div class="scheme-toggle">
+    <span>全羅書寫系統：</span>
+    <label><input type="radio" name="scheme" value="tailo" checked /> 教育部台羅（Tâi-lô）</label>
+    <label><input type="radio" name="scheme" value="poj" /> 白話字（POJ）</label>
+  </div>
+
+  <div class="field hanzi">
+    <label for="hanziInput">全漢字</label>
+    <textarea id="hanziInput" placeholder="請輸入台語漢字，例如：食飯"></textarea>
+  </div>
+
+  <div class="field">
+    <label id="tailoLabel" for="tailoInput">全羅（教育部台羅）</label>
+    <textarea id="tailoInput" placeholder="例如：tsia̍h-pn̄g"></textarea>
+  </div>
+
+  <div class="field">
+    <label id="numericLabel" for="numericInput">羅馬字加音調數字（教育部台羅）</label>
+    <textarea id="numericInput" placeholder="例如：tsiah8-png7"></textarea>
+  </div>
+
+  <p id="sourceIndicator" class="source-indicator"></p>
+
+  <div class="detail-panel">
+    <label>解析結果（點擊任一個詞可以修改讀音／補音檔，辭典沒收錄的字會標示警告）</label>
+    <div id="detailRow"></div>
+  </div>
+
+  <div class="detail-panel sandhi-panel">
+    <label>變調後（連讀參考用，套用台語標準連讀變調規則，不影響播放與其他欄位）</label>
+    <div id="sandhiRow"></div>
+  </div>
+
+  <div id="tokenEditor" class="token-editor" hidden>
+    <p id="tokenEditorWarning" class="warning-text" hidden>⚠ 辭典沒有收錄這個詞，請提供讀音（音檔可留空）</p>
+    <div id="tokenEditorChoices" class="token-editor-choices" hidden></div>
+    <div class="token-editor-row">
+      <label for="tokenEditorHanzi">漢字</label>
+      <input type="text" id="tokenEditorHanzi" />
+    </div>
+    <div class="token-editor-row">
+      <label for="tokenEditorTrs">正確讀音（教育部台羅／白話字變音標，或數字調皆可）</label>
+      <input type="text" id="tokenEditorTrs" placeholder="例如 tsia̍h-pn̄g 或 tsiah8-png7" />
+    </div>
+    <div class="token-editor-row">
+      <label for="tokenEditorAudio">上傳這個詞的音檔（可選；留空會嘗試自動合成，見下方提示）</label>
+      <input type="file" id="tokenEditorAudio" accept="audio/*" />
+      <p id="tokenEditorAudioHint" class="token-editor-hint" hidden></p>
+    </div>
+    <p id="tokenEditorError" class="token-editor-error" hidden></p>
+    <div class="token-editor-actions">
+      <button id="tokenEditorSave" type="button">儲存（存進自訂詞庫）</button>
+      <button id="tokenEditorCancel" type="button">取消</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">▶ 播放語音</button>
+    <button id="stopBtn">■ 停止</button>
+    <button id="downloadBtn">⬇ 下載語音（WAV）</button>
+    <span class="speed-control">
+      <label for="speedSelect">語速</label>
+      <select id="speedSelect">
+        <option value="0.5">0.5×</option>
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1×（正常）</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="2">2×</option>
+        <option value="2.5">2.5×</option>
+        <option value="3">3×</option>
+        <option value="4">4×</option>
+        <option value="5">5×</option>
+        <option value="6">6×</option>
+      </select>
+    </span>
+  </div>
+  <p id="downloadStatus" class="download-status"></p>
+  <div id="manualLinks" class="manual-links" hidden>
+    <p>以下詞條使用萌典官方音檔，該伺服器不開放程式合併下載（非本工具的限制）。請個別點開連結，在新分頁用瀏覽器的「另存音訊」／右鍵「儲存音訊為」保存。若改用 <code>python serve.py</code> 開啟這個頁面，或部署 <code>cloudflare-worker.js</code>（見「❓ 說明」），就能直接合併下載，不用逐個另存：</p>
+    <div id="manualLinksList"></div>
+  </div>
+
+  <div id="helpPanel" class="help-panel" hidden>
+    <h2>使用說明</h2>
+
+    <h3>三種寫法互相同步</h3>
+    <p>編輯全漢字、全羅、羅馬字加音調數字任一欄，另外兩欄會自動反推。<strong>沒有固定以哪個為主</strong>——頁面上方會顯示「目前以哪個欄位為準」；想改成以羅馬字為主，直接編輯全羅或數字調欄位即可，漢字會自動跟著配對過去。</p>
+
+    <h3>轉換錯了怎麼辦</h3>
+    <p>點擊解析結果列裡的任何一個詞，會打開修改面板：如果辭典本來就有多個讀音（例如破音字），會列成按鈕可以直接點選；也可以直接輸入正確的羅馬字（變音標或數字調都可以），甚至上傳這個詞自己的音檔。儲存後會存進「自訂詞庫」，疊加在官方辭典之上，下次打開頁面還在，語音也會跟著用你存的版本。如果沒有上傳音檔，會自動嘗試合成一個（借用這個詞變調後同音字的官方錄音接起來，跟「下載語音」用的是同一套機制）；真的找不到才會維持沒有音檔，之後可以再補。重新編輯一個已經有音檔的詞、這次沒有重新選檔案時，原本的音檔會保留，不會被清空或換掉。</p>
+
+    <h3>辭典沒收錄的字</h3>
+    <p>辭典沒有的漢字，或是羅馬字沒對應到任何漢字，都會在解析結果列標示 ⚠ 警告。點擊一樣可以打開修改面板，自己補上讀音／漢字／音檔。</p>
+
+    <h3>變調後（連讀參考）</h3>
+    <p>解析結果下方會多顯示一列「變調後」，套用台語標準連讀變調規則（1→7→3→2→1 循環、第5聲另外分支到7、入聲 4↔8 對調、喉塞韻尾 -h 的入聲則去 h 變舒聲），把每個字的本調換算成連續講話時實際會變成的調——只有整句（依標點斷句）最後一個音節維持本調，其餘都變調。這一列用數字調顯示（不是變音標），方便直接跟上面「羅馬字加音調數字」欄位逐字對照，一眼看出哪個音節的調變了；本身純粹是參考用文字，不會回寫到其他欄位。就算辭典查無讀音、只顯示〔數字調〕占位的詞，一樣可以套用變調規則算出參考音，因為變調只需要知道本調數字，不需要真的查到字。</p>
+    <p>另外支援兩條特殊規則：<strong>輕聲</strong>——羅馬字裡用「--」接的音節（例如「一來」教育部辭典本身就寫成 <code>it--lâi</code>）會被視為輕聲，前一個音節因此維持本調不跟著變調，「--」也會原樣保留在全羅／數字調欄位，不會被當成普通的「-」吃掉；<strong>三疊字變調</strong>——同一個變調組裡連續三個本調完全相同的音節（例如「紅紅紅」加強語氣），套用專屬規則：最後一字維持本調、中間字一般變調、第一字若本調是 1／5／7／8 則變成「中升調」（教育部辭典沒錄這個調值的音檔，慣例上以第5聲代替標記）。</p>
+    <p class="footnote">變調分組是「遇到主要標點就斷開」的簡化版，複雜句子（例如巢狀輕聲、超過三個字的疊字）的分組可能跟真實語感有落差，僅供參考。</p>
+
+    <h3>沒有音檔時，借用變調後同音字的錄音</h3>
+    <p>有些詞辭典本身沒有音檔（教育部只錄「單字能成詞」的讀音，很多字單獨存在時反而沒錄音），或是查無此字。遇到這種情況，系統會用「變調後」算出來的讀音，反查辭典裡有沒有別的字剛好本調就唸這個音：</p>
+    <ul>
+      <li>先試整個詞（所有音節合在一起）查——找得到最準，是同一個詞完整的錄音。</li>
+      <li>整個詞查不到的話（多音節複合詞常常這樣，例如「頭緒」辭典沒收錄），改成一個音節一個音節分開查、各自借用同音字的錄音接起來播放；要每個音節都借得到才會用，不會播一半借到、一半沒聲音的破碎結果。</li>
+    </ul>
+    <p>找到的話，畫面上標示淺藍色底線加 <code>~</code>，滑鼠移過去會顯示借用自哪個字（逐音節借用時會列出每個音節各自借用的字）。原則是：<strong>詞本身有音檔就優先用它自己的（主）；沒有的話，才用變調後查到的音檔代替（副）</strong>。因為變調後的讀音在物理上就是那個聲音，跟是哪個字沒有關係，借用來播放是合理的；完全找不到（連逐音節都借不到）的詞，就還是沒有音檔可播放。</p>
+
+    <h3>播放語音</h3>
+    <p>依詞序接續播放教育部辭典的真人錄音（不是語音合成），可調整語速。串接播放沒有連續語流的連讀變調，逐字聽起來會比整句自然語音生硬一些，這是音檔本身（單字錄音）的性質，沒辦法完全消除，但詞與詞之間已依標點做了停頓節奏調整。</p>
+
+    <h3>下載語音（WAV）</h3>
+    <p>你自己上傳的音檔一定能合併下載；教育部官方辭典音檔的伺服器不開放跨網域讀取，預設遇到官方音檔會改列出個別連結供手動另存。想連官方音檔也一起合併下載，有兩種選擇，可以只設一個、也可以兩個都設：</p>
+    <ul>
+      <li><strong>本機：</strong>改用附的 <code>serve.py</code> 開啟（需要 Python）：終端機執行 <code>python serve.py</code>，再開 <code>http://localhost:8791/index.html</code>。</li>
+      <li><strong>雲端（連 GitHub Pages 上也能用）：</strong>把 <code>cloudflare-worker.js</code> 部署到自己的 Cloudflare 帳號（免費），再把拿到的網址填進 <code>export.js</code> 的 <code>EXTERNAL_PROXY_BASE</code>。詳細步驟見 README「讓「下載語音」在 GitHub Pages 上也能合併官方音檔」。</li>
+    </ul>
+    <p>兩種原理相同：由你自己控制的電腦或雲端帳號代為讀取音檔、再回傳給頁面，不經任何你不認識的第三方伺服器。</p>
+
+    <h3>自訂詞庫格式</h3>
+    <p>CSV 或 JSON，UTF-8 編碼。CSV 需含表頭，欄位為「漢字,羅馬字,音檔,備註」（後兩欄可留空）；羅馬字可用全羅變音標或數字調任一種寫法，多音節詞用「-」連接。JSON 則為物件陣列，鍵名可用中文或英文：<code>{"漢字":"...","羅馬字":"...","音檔":"（選填）","備註":"（選填）"}</code>。範例檔：
+    <a href="custom-dictionary-example.csv" target="_blank" rel="noopener">custom-dictionary-example.csv</a>、
+    <a href="custom-dictionary-example.json" target="_blank" rel="noopener">custom-dictionary-example.json</a>。如果是用 Excel 編輯 CSV，存檔時選「CSV UTF-8」，不要選一般「CSV」，不然中文字用 Excel 直接雙擊開啟時會變亂碼（本工具匯入不受影響，這只影響你自己在 Excel 裡看檔案）。</p>
+    <p>「匯入自訂詞庫」旁邊的「查看自訂詞庫」可以展開列表看目前存了什麼（含試聽音檔），每一筆都能單獨刪除。列表裡的「匯出自訂詞庫（含音檔，JSON）」會把你自己上傳的本機音檔內嵌進同一個 JSON 檔（存成 <code>data:</code> 開頭的音檔資料），匯出的這個檔案可以直接用「匯入自訂詞庫」讀回來，讀音跟音檔會一起還原，不用另外重新上傳音檔——適合備份，或是搬到別台裝置、別個瀏覽器繼續累積用。</p>
+
+    <h3>自己的錄音／音檔</h3>
+    <p>不需要架網站放檔案。「音檔」欄位可以直接寫檔名（例如 <code>a-ma.mp3</code>），再用「上傳自訂音檔」選取本機音檔（mp3／wav／ogg 皆可），系統會依檔名自動配對（區分大小寫、副檔名都要一致）；也可以填完整的 http(s) 網址。音檔存在瀏覽器本機（IndexedDB），不會上傳到任何伺服器。</p>
+
+    <h3>資料存在哪裡？要不要自己匯出備份？</h3>
+    <p>辭典快取、自訂詞庫、自訂音檔都存在瀏覽器本機的 IndexedDB，不會上傳到任何伺服器。只要是同一台電腦、同一個瀏覽器、不是無痕視窗，資料會自動留著，重開頁面、重開瀏覽器都還在，<strong>不需要每次手動匯出</strong>。只有想備份（怕清瀏覽器資料、重灌電腦等意外洗掉）、想換電腦／換瀏覽器繼續用、用無痕視窗（分頁關掉就會被清掉），或想分享給別人時，才需要用「匯出自訂詞庫（含音檔，JSON）」——匯出的就是一個存在你自己下載資料夾裡的普通 JSON 檔，等同直接放在本機硬碟上的備份，之後用「匯入自訂詞庫」讀回來就能完整復原。</p>
+
+    <h3>修改日誌</h3>
+    <ul id="changelogList">
+      <li><strong>v1.16.1 — 2026-09-12 14:14</strong>：修正補上讀音面板裡「破音字切換」選項看不出來是不同字的問題——當一段羅馬字／數字調反查出來對到好幾個「同音但不同漢字」的候選（例如 tíng 同時對到「戥」「等」「頂」「鼎」四個字）時，選項按鈕以前只顯示讀音類型跟羅馬字（例如都寫「讀音：tíng」），看起來像重複選項，完全看不出來要選的其實是不同的字。現在每個選項按鈕會先顯示對應的漢字（例如「戥　讀音：tíng」「等　文：tíng」），才看得出來在選哪個字。（同一個漢字底下的破音字，例如食的白讀／文讀，維持原樣不受影響，因為漢字欄位本身已經顯示那個字，不用重複。）</li>
+      <li><strong>v1.16.0 — 2026-09-12 14:00</strong>：修正補上讀音時自動合成音檔常常找不到的問題——例如「看護」khàn-hōo，「看」單獨查得到本調 khàn（第3聲）的錄音、「護」查得到 hōo（第7聲）的錄音，但自動合成原本是拿「這個詞自己變調後」的讀音去找候選（「看」在詞裡變調後是第2聲），而 khan2 這個調值根本不是任何字的本調、教育部辭典裡完全沒有這個候選可試，導致直接放棄整個詞。現在改成：變調後讀音找不到任何候選時，改用本調（原本輸入的調）讀音再試一次，找到就用；兩層都試過還是沒有才真的放棄。</li>
+      <li><strong>v1.15.0 — 2026-09-12 13:49</strong>：修正白話字（POJ）「羅馬字加音調數字」欄位混入 <code>o͘</code>（頂標點）／<code>ⁿ</code>（鼻化上標）這兩個特殊 unicode 符號的問題——例如「看護」khan-hō͘ 轉出來的數字調本來是 <code>khan1-ho͘7</code>，但很多字型根本沒有 <code>o͘</code> 的字形，畫面上那個點直接看不見，看起來就像少了一個 o 的 <code>khan1-ho7</code>；<code>ⁿ</code> 雖然顯示正常，但拿去做音檔檔名比對、或貼到其他工具比對時，因為不是純 ASCII 常常對不起來。現在數字調欄位一律用純 ASCII 的 <code>oo</code>／<code>nn</code>（例如 <code>khan1-hoo7</code>、<code>pinn1</code>），白話字變音標欄位（顯示 <code>hō͘</code>／<code>piⁿ</code> 這種正字法）不受影響、一樣正確顯示。</li>
+      <li><strong>v1.14.1 — 2026-09-12 11:56</strong>：修正自動合成音檔常常失敗的問題——教育部辭典資料裡有些字雖然列了音檔編號，實際上並沒有真的錄過單字音（「單字不成詞者不單獨錄音」），之前找到這種「有編號但沒真檔案」的同音字就直接放棄整個詞；現在改成抓不到就自動換下一個同音候選字繼續試，找到真的有錄音的才用。</li>
+      <li><strong>v1.14.0 — 2026-09-12 11:44</strong>：語速選項加到 6×（原本最高 4×）。同時修好一個既有的 bug：語速選單其實一直沒有真的生效過——瀏覽器的 <code>audio.load()</code> 會把 <code>playbackRate</code> 重設回 1，但程式原本是先設定語速才呼叫 <code>load()</code>，等於白設。已改成 <code>load()</code> 之後才設定語速，實測確認選哪個速度、播放時就真的是那個速度。</li>
+      <li><strong>v1.13.0 — 2026-09-12 08:12</strong>：補上讀音時，如果沒有上傳音檔，現在會自動嘗試合成一個——用跟「下載語音」一樣的合併機制，借用這個詞變調後同音字的官方錄音接起來，存成一個音檔存進自訂詞庫，不用真的自己錄音或另外找檔案。找不到可借用的錄音，或目前環境沒有設定 serve.py／Cloudflare Worker（讀不到官方音檔的位元組）時，會照舊維持沒有音檔、之後可以自行上傳。重新編輯一個已經有音檔（不論是自己上傳或自動合成）的詞、這次沒有重新選檔案時，會保留原本的音檔，不會被清空或換成新合成的。</li>
+      <li><strong>v1.12.1 — 2026-09-12 07:39</strong>：修正點擊同一個詞重新補上讀音／音檔時，會在自訂詞庫裡多存一筆重複資料的問題（舊的那筆會一直留著，「查看自訂詞庫」會看到同一個詞出現兩次，其中一筆永遠沒有音檔）。現在存檔時若偵測到同一個漢字、同一個實際讀音（拼法不同但骨架調號相同也算，例如白話字 <code>soan1</code> 跟台羅 <code>suan1</code>）已經存在，會直接取代那一筆；真正不同讀音（破音字）才會新增成獨立一筆。</li>
+      <li><strong>v1.12.0 — 2026-09-12 07:22</strong>：新增「查看自訂詞庫」——「匯入自訂詞庫」旁邊多一個按鈕，可以展開列表看目前存的每一筆自訂詞條（漢字／讀音／音檔，音檔可以直接在列表裡試聽），每一筆都能單獨刪除，不用整個「清除自訂詞庫」重來。也新增「匯出自訂詞庫（含音檔，JSON）」，會把使用者自己上傳的本機音檔內嵌成 data: URL 一起存進同一個 JSON 檔，之後直接用「匯入自訂詞庫」讀回來就會連讀音跟音檔一起還原，不用另外管理音檔案，方便備份與搬到別台裝置繼續用。</li>
+      <li><strong>v1.11.1 — 2026-09-12 06:55</strong>：修正「補上讀音」編輯面板在頁面一載入就整個顯示出來的 CSS 錯誤（`.token-editor` 自己設了 <code>display: flex</code>，蓋掉瀏覽器內建的 <code>[hidden]</code> 隱藏效果，讓還沒點任何詞就先看到一整塊編輯區塊）；改成全站一律用 <code>[hidden] { display: none !important; }</code> 保證任何元素設了 <code>hidden</code> 都真的會被藏起來。（同時確認：點詞條補上讀音時，「正確讀音」跟「上傳這個詞的音檔」本來就是同一個「儲存」按鈕一起存進自訂詞庫，不用另外操作。）</li>
+      <li><strong>v1.11.0 — 2026-09-12 06:19</strong>：修正「變調後」的判斷範圍——原本是整個標點分隔的子句一起判斷（只有子句最後一個音節維持本調），改成以「詞」為單位（每個辭典詞或用「-」接起來的羅馬字組，只有詞自己的尾字維持本調，不受後面接了什麼字影響）。例如「學校真好」的「校」以前會被誤判成非尾字而變調，現在正確維持本調 hāu；相對地，像「我食飯」這種由三個各自查得到的「一字詞」組成的句子，因為每個單字都各自是一個「尾字＝唯一一字」的詞，現在也都維持本調不變調，這是套用參考變調工具「一字組不變調」規則後的正確結果。</li>
+      <li><strong>v1.10.0 — 2026-09-12 05:42</strong>：「變調後」列補上輕聲（--）與三疊字變調（如「紅紅紅」）兩條規則；輕聲標記現在會保留在全羅／數字調欄位裡（例如官方辭典本來就有的「一來」it--lâi），不會再被吃掉變成普通的 -。</li>
+      <li><strong>v1.9.3 — 2026-09-12 05:27</strong>：修正播放中途按「停止」後，播放／停止鍵會永遠卡住無法再按的問題（<code>audio.pause()</code> 不會觸發讓程式繼續往下走的事件，導致整個播放流程卡住）。</li>
+      <li><strong>v1.9.2 — 2026-09-12 05:15</strong>：架構圖新增離線可看的 SVG 檔案（<code>docs/</code> 資料夾），不用連網、不用 Markdown 支援 Mermaid 也能開。</li>
+      <li><strong>v1.9.1 — 2026-09-12 05:00</strong>：更新時間加上時分（不只日期）；README 新增架構圖。</li>
+      <li><strong>v1.9.0 — 2026-09-12</strong>：「變調後」列改用數字調（不用變音標），方便跟上面「羅馬字加音調數字」欄位逐字對照；沒有音檔的多音節詞，原本只試整個詞一起借音失敗就放棄，現在會再試逐音節分開借用同音字錄音接起來播放（每個音節都借得到才播，避免播一半沒聲音）。</li>
+      <li><strong>v1.8.1 — 2026-09-12</strong>：修正貼上文章時，字詞後面緊貼標點（沒有空白，如「chok-iong.」「kò-chō,」）會導致整個詞解析失敗、原封不動顯示的問題——現在會先拆開黏著的標點再解析。</li>
+      <li><strong>v1.8.0 — 2026-09-12</strong>：沒有音檔的詞，會自動借用「變調後」剛好同音的其他詞的錄音來播放（標示淺藍色底線＋<code>~</code>，滑鼠移過去可看借用自哪個字）；詞本身有音檔時仍優先用它自己的。</li>
+      <li><strong>v1.7.0 — 2026-09-12</strong>：解析結果下方新增「變調後」參考列，依台語標準連讀變調規則顯示連讀時的實際調值（不影響播放、也不影響其他欄位）；辭典查無讀音、只顯示〔數字調〕占位的詞也能一起參與變調計算。</li>
+      <li><strong>v1.6.1 — 2026-09-12</strong>：語速選項加到 4×（原本最高 2×）。</li>
+      <li><strong>v1.6.0 — 2026-09-11</strong>：併入萌典補充詞資料（<code>dict-twblg-ext.json</code>，約 6,800 筆，含真人錄音），辭典收錄從約 14,500 詞增加到約 20,600 詞，來源與版本細節見 README「資料來源」。</li>
+      <li><strong>v1.5.1 — 2026-09-11</strong>：修正範例 CSV 用 Excel 雙擊開啟會變亂碼的問題（缺 UTF-8 BOM），並加上匯入自己 CSV 時的編碼提醒。</li>
+      <li><strong>v1.5.0 — 2026-09-11</strong>：新增 <code>cloudflare-worker.js</code>（選用），讓 GitHub Pages 上的版本也能合併下載官方音檔，不用本機開著 <code>serve.py</code>。</li>
+      <li><strong>v1.4.0 — 2026-09-11</strong>：修正切換全羅書寫系統時「羅馬字加音調數字」欄位沒有跟著變的問題；頁面上方加版本號與更新日期。</li>
+      <li><strong>v1.3.0 — 2026-09-11</strong>：加入 GitHub Pages 部署設定與說明。</li>
+      <li><strong>v1.2.0 — 2026-09-11</strong>：新增 <code>serve.py</code>（選用），讓「下載語音」也能合併官方辭典音檔，不經第三方伺服器。</li>
+      <li><strong>v1.1.0 — 2026-09-11</strong>：新增點擊詞條即可修正讀音／補音檔（含辭典未收錄的警示與補登）；明亮／深色模式手動切換；語速調整；手機版面；播放節奏依標點停頓＋預先載入音檔。</li>
+      <li><strong>v1.0.0 — 2026-09-10</strong>：初版：全漢字／全羅（教育部台羅／白話字）／數字調三向同步、播放教育部辭典真人錄音、多音字切換、自訂詞庫（CSV／JSON）、自訂音檔上傳、下載語音（WAV，含官方音檔 CORS 限制的個別連結備援）。</li>
+    </ul>
+    <p class="footnote">完整版本歷史見 <a href="README.md" target="_blank" rel="noopener">README.md</a>。</p>
+  </div>
+
+  <footer>
+    辭典資料來源：教育部《臺灣台語常用詞辭典》，經
+    <a href="https://github.com/g0v/moedict-data-twblg" target="_blank" rel="noopener">g0v/moedict-data-twblg</a>
+    （萌典）整理；語音為辭典真人錄音，並非語音合成。詳細使用說明請按右上角「❓ 說明」。
+  </footer>
+</main>
+
+<script src="romanize.js"></script>
+<script src="dict.js"></script>
+<script src="export.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
